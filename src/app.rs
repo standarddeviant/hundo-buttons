@@ -1,20 +1,33 @@
+use crate::phrases::{crowded_phrase, lonely_phrase};
+use crate::random_color::random_pastel_color;
+use crate::toggle_button_compact;
+use egui::Color32;
+use egui::UiKind::ScrollArea;
+// use eframe::{Align2, Color32, Direction, Frame, Pos2, Ui, Widget};
+use egui_toast::Toasts;
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
     // Example stuff:
-    label: String,
-
     #[serde(skip)] // This how you opt-out of serialization of a field
-    value: f32,
+    hundo_buttons: bool,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    color_list: Vec<Color32>,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    message: String,
 }
 
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
+            hundo_buttons: false,
+            color_list: vec![],
+            message: "hmm..".to_owned(),
             // Example stuff:
-            label: "Hello World!".to_owned(),
-            value: 2.7,
+            // label: "Hello World!".to_owned(),
+            // value: 2.7,
         }
     }
 }
@@ -46,6 +59,10 @@ impl eframe::App for TemplateApp {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
+        let mut toasts = Toasts::new();
+        // .anchor(Align2::RIGHT_BOTTOM, (-10.0, -10.0)) // 10 units from the bottom right corner
+        // .direction(egui::Direction::BottomUp);
+
         egui::Panel::top("top_panel").show_inside(ui, |ui| {
             // The top panel is often a good place for a menu bar:
 
@@ -67,43 +84,80 @@ impl eframe::App for TemplateApp {
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
-            ui.heading("eframe template");
+            ui.heading("hundo-buttons");
+            ui.label("A fun example of what an immediate mode GUI is capable of.");
 
-            ui.horizontal(|ui| {
-                ui.label("Write something: ");
-                ui.text_edit_singleline(&mut self.label);
-            });
+            ui.separator();
+            ui.label("Would you like one hundred buttons?");
 
-            ui.add(egui::Slider::new(&mut self.value, 0.0..=10.0).text("value"));
-            if ui.button("Increment").clicked() {
-                self.value += 1.0;
+            let prev_hundo: bool = self.hundo_buttons;
+            toggle_button_compact(ui, &mut self.hundo_buttons);
+            if !prev_hundo && self.hundo_buttons {
+                self.color_list = (0..100).map(|_| random_pastel_color()).collect();
             }
 
             ui.separator();
+            ui.heading(self.message.clone());
 
+            if self.hundo_buttons {
+                egui::ScrollArea::both().show(ui, |ui| {
+                    egui::Grid::new("my_grid")
+                        .striped(false) // Adds a subtle background color to alternate rows
+                        // .col_width(100.0)
+                        .min_col_width(80.0)
+                        .show(ui, |ui| {
+                            let mut count = 0;
+                            for _row in 0..10 {
+                                for _col in 0..10 {
+                                    if ui
+                                        .add(
+                                            egui::Button::new(format!("Button {}", count + 1))
+                                                .fill(self.color_list[count])
+                                                .stroke(egui::Stroke::new(
+                                                    2.0,
+                                                    egui::Color32::BLACK,
+                                                )),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.message =
+                                            format!("Button {} says: {}", count, crowded_phrase());
+                                        // hmmm, what to do?
+                                    }
+                                    count += 1;
+                                }
+                                ui.end_row();
+                            }
+                        });
+                });
+            } else {
+                if ui.button("Just a solitary button..").clicked() {
+                    self.message = format!("A lonely button says: {}", lonely_phrase());
+                }
+            }
+        });
+
+        egui::Panel::bottom("bottom_panel").show_inside(ui, |ui| {
             ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/main/",
+                "https://github.com/standarddeviant/hundo-buttons/blob/main/",
                 "Source code."
             ));
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                powered_by_egui_and_eframe(ui);
-                egui::warn_if_debug_build(ui);
-            });
         });
-    }
-}
 
-fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
-        ui.label("Powered by ");
-        ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-        ui.label(" and ");
-        ui.hyperlink_to(
-            "eframe",
-            "https://github.com/emilk/egui/tree/master/crates/eframe",
-        );
-        ui.label(".");
-    });
+        //     // The top panel is often a good place for a menu bar:
+        //     egui::MenuBar::new().ui(ui, |ui| {
+        //         // NOTE: no File->Quit on web pages!
+        //         let is_web = cfg!(target_arch = "wasm32");
+        //         if !is_web {
+        //             ui.menu_button("File", |ui| {
+        //                 if ui.button("Quit").clicked() {
+        //                     ui.send_viewport_cmd(egui::ViewportCommand::Close);
+        //                 }
+        //             });
+        //             ui.add_space(16.0);
+        //         }
+        //         egui::widgets::global_theme_preference_buttons(ui);
+        //     });
+        // });
+    }
 }
